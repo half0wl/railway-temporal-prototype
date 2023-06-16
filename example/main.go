@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/half0wl/railway-temporal/example/cron"
@@ -20,9 +21,28 @@ func main() {
 
 	fmt.Println("Temporal host: ", TEMPORAL_HOST)
 
-	c, err := client.Dial(client.Options{
-		HostPort: TEMPORAL_HOST,
-	})
+	var c client.Client
+	var err error
+	for i := 0; i < 15; i++ {
+		attempt := i + 1
+		fmt.Printf("Attempting Temporal connection attempt=%d\n", attempt)
+		c, err = client.Dial(client.Options{
+			HostPort: TEMPORAL_HOST,
+		})
+		if err != nil {
+			fmt.Printf("Temporal connection failed, retrying... attempt=%d\n", attempt)
+			time.Sleep(time.Second)
+			continue
+		}
+		_, err = c.CheckHealth(context.Background(), &client.CheckHealthRequest{})
+		if err != nil {
+			fmt.Printf("Temporal healthcheck failed, retrying... attempt=%d\n", attempt)
+			time.Sleep(time.Second)
+			continue
+		}
+		break
+	}
+
 	if err != nil {
 		log.Fatalln("Unable to create client", err)
 	}
